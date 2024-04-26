@@ -44,11 +44,13 @@ func (this *ECS) CreateEntity(components ...any) Entity {
 
 	// Store entities
 	this.entities[entity.Id()] = entity
+	// Add components to entity as reference
+	entity.AddComponents(components...)
 
 	// Add components to systems
 	systems := this.systems.QuerySystems(components...)
 	for _, system := range systems {
-		system.addEntity(entity)
+		system.AttachEntity(entity)
 	}
 
 	// Store components globally by type
@@ -63,10 +65,32 @@ func (this *ECS) CreateEntity(components ...any) Entity {
 	return entity
 }
 
+// RemoveEntity detaches the entity & components from all systems and globally
+func (this *ECS) RemoveEntity(id uint64) {
+	entity := this.entities[id]
+
+	// Remove from systems
+	systems := this.systems.QuerySystems(entity.GetComponents())
+	for _, system := range systems {
+		system.DetachEntity(entity)
+	}
+
+	// Remove from global components
+	for _, c := range entity.GetComponents() {
+		cType := this.getPlainType(c)
+		delete(this.components[cType], entity.Id())
+	}
+
+	// delete entities
+	delete(this.entities, id)
+}
+
+// GetEntity returns the id referenced entity of this ECS
 func (this *ECS) GetEntity(id uint64) Entity {
 	return this.entities[id]
 }
 
+// TODO: AddEntity via reflection of embedded structs
 //func (this *ECS) AddEntity(e any) Entity {
 //	entity := newEntity(&this.entityCounter)
 //
@@ -90,8 +114,16 @@ func (this *ECS) GetComponents(componentType any) map[uint64]interface{} {
 	return this.components[this.getPlainType(componentType)]
 }
 
+// AddSystem attaches the given system to this ECS under the given types
 func (this *ECS) AddSystem(s System, types ...any) *ECS {
 	this.systems.AddSystem(s, types...)
+	// TODO: Check whether existing entities should be added to this new system
+	return this
+}
+
+// RemoveSystem deletes the given system from this ECS
+func (this *ECS) RemoveSystem(s System) *ECS {
+	this.systems.RemoveSystem(s)
 	return this
 }
 

@@ -4,6 +4,7 @@ import "sync/atomic"
 
 type Entity interface {
 	Id() uint64
+	GetComponents() []any
 }
 
 type BaseEntity struct {
@@ -17,8 +18,18 @@ func NewEntity(counter *atomic.Uint64) (this *BaseEntity) {
 	return this
 }
 
-func (this *BaseEntity) addComponent(component any) {
+func (this *BaseEntity) AddComponent(component any) {
 	this.components = append(this.components, component)
+}
+
+func (this *BaseEntity) AddComponents(component ...any) {
+	for _, c := range component {
+		this.AddComponent(c)
+	}
+}
+
+func (this *BaseEntity) GetComponents() []any {
+	return this.components
 }
 
 func (this *BaseEntity) Id() uint64 {
