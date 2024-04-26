@@ -1,8 +1,6 @@
 package ecs
 
 import (
-	"log"
-	"reflect"
 	"testing"
 	"time"
 )
@@ -26,25 +24,33 @@ type CommComponent struct {
 }
 
 type MoveSystem struct {
+	BaseSystem
 }
 
 func (this *MoveSystem) Run(ecs *ECS, dt time.Duration) {
+	pos := ecs.GetComponents(PositionComponent{})
+	vel := ecs.GetComponents(VelocityComponent{})
 
+	for _, entityId := range this.entities {
+		p := pos[entityId].(*PositionComponent)
+		v := vel[entityId].(*VelocityComponent)
+		p.X += v.DX
+		p.Y += v.DY
+	}
 }
 
 type CollisionSystem struct {
-	pos    HasSystem[PositionComponent]
-	bounds HasSystem[BoundsComponent]
+	BaseSystem
 }
 
 func (this *CollisionSystem) Run(ecs *ECS, dt time.Duration) {
-	positions := GetComponents[PositionComponent](ecs)
-	bounds := GetComponents[BoundsComponent](ecs)
-	log.Println(positions)
-	log.Println(bounds)
+	positions := ecs.GetComponents(PositionComponent{})
+	bounds := ecs.GetComponents(BoundsComponent{})
 
-	sPositions := this.pos.GetComponents()
-	log.Println(sPositions)
+	for _, entityId := range this.entities {
+		_ = positions[entityId].(*PositionComponent)
+		_ = bounds[entityId].(*BoundsComponent)
+	}
 
 	//this.players.Range(func(key *uuid.UUID, player *Player) bool {
 	//	// Reset collision
@@ -71,177 +77,110 @@ type Player struct {
 	BoundsComponent
 	CommComponent
 
-	something string
+	s string
+}
+
+// createPlayer is a helper to create testable player objects
+func createPlayer(s string) Player {
+	return Player{
+		PositionComponent: PositionComponent{X: 1, Y: 1},
+		VelocityComponent: VelocityComponent{DX: 2, DY: 2},
+		BoundsComponent:   BoundsComponent{Width: 10, Height: 10},
+		CommComponent:     CommComponent{},
+		s:                 s,
+	}
 }
 
 func TestECS(t *testing.T) {
-	player := Player{
-		PositionComponent: PositionComponent{},
-		VelocityComponent: VelocityComponent{},
-		BoundsComponent:   BoundsComponent{},
-		CommComponent:     CommComponent{},
-	}
-
-	//fields := make([]reflect.Value, 0)
-	ifv := reflect.ValueOf(player)
-	ift := reflect.TypeOf(player)
-
-	for i := 0; i < ift.NumField(); i++ {
-		v := ifv.Field(i)
-
-		switch v.Kind() {
-		case reflect.Struct:
-			log.Println("struct", v, v.Kind(), reflect.TypeOf(v.Interface()))
-		default:
-			log.Println("not", v, v.Kind(), reflect.TypeOf(v))
-		}
-	}
-
 	// Create a new world
-	//ecs := New()
-	//ecs.AddSystem()
+	ecs := New()
 
-	//// Tick for 30 fps to simulate a game update
-	//done := make(chan bool, 1)
-	//ticker := time.NewTicker(33 * time.Millisecond)
-	//go func() {
-	//	var dt time.Duration
-	//	lastTimestamp := time.Now()
-	//
-	//	for {
-	//		select {
-	//		case <-done:
-	//			return
-	//		case tick := <-ticker.C:
-	//			// Save the diff, time and tick
-	//			dt = tick.Sub(lastTimestamp)
-	//			lastTimestamp = tick
-	//
-	//			// ECS update
-	//			ecs.Update(dt)
-	//		}
-	//	}
-	//}()
-	//
-	//time.Sleep(1000 * time.Millisecond)
-	//<-done
+	// Add some interacting systems, working with same and different components
+	ecs.AddSystem(&MoveSystem{}, PositionComponent{}, VelocityComponent{})
+	ecs.AddSystem(&CollisionSystem{}, PositionComponent{}, BoundsComponent{})
+
+	// Add some entities, which are not captured by any system
+	ecs.CreateEntity(&PositionComponent{X: 1, Y: 1})          // 1
+	ecs.CreateEntity(&VelocityComponent{DX: 2, DY: 2})        // 2
+	ecs.CreateEntity(&BoundsComponent{Width: 10, Height: 10}) // 3
+
+	// Add two fully fledged players, with more than needed components
+	player4 := createPlayer("player4")
+	ecs.CreateEntity(&player4.PositionComponent, &player4.VelocityComponent, &player4.BoundsComponent) // 4
+	player5 := createPlayer("player5")
+	ecs.CreateEntity(&player5.PositionComponent, &player5.VelocityComponent, &player5.BoundsComponent) // 5
+
+	// Add reduced players, only fitting one system each
+	player6 := createPlayer("player6")
+	ecs.CreateEntity(&player6.PositionComponent, &player6.VelocityComponent) // 6
+	player7 := createPlayer("player7")
+	ecs.CreateEntity(&player7.PositionComponent, &player7.VelocityComponent) // 7
+	player8 := createPlayer("player8")
+	ecs.CreateEntity(&player8.PositionComponent, &player8.BoundsComponent) // 8
+	player9 := createPlayer("player9")
+	ecs.CreateEntity(&player9.PositionComponent, &player9.BoundsComponent) // 9
+
+	// Tick for 30 fps to simulate a game update
+	var fps = 30
+	for i := 0; i < fps; i++ {
+		ecs.Update(33 * time.Millisecond)
+	}
+
+	// Assertions
+	if player4.X != (1+player4.DX*fps) || player4.Y != (1+player4.DY*fps) {
+		t.Errorf("player4(%d, %d); expected %d", player4.X, player4.Y, 1+player4.DX*30)
+	}
+	if player5.X != (1+player5.DX*fps) || player5.Y != (1+player5.DY*fps) {
+		t.Errorf("player5(%d, %d); expected %d", player5.X, player5.Y, 1+player5.DX*30)
+	}
+	if player6.X != (1+player6.DX*fps) || player6.Y != (1+player6.DY*fps) {
+		t.Errorf("player6(%d, %d); expected %d", player6.X, player6.Y, 1+player6.DX*30)
+	}
+	if player7.X != (1+player7.DX*fps) || player7.Y != (1+player7.DY*fps) {
+		t.Errorf("player7(%d, %d); expected %d", player7.X, player7.Y, 1+player7.DX*30)
+	}
+	if player8.X != 1 || player8.Y != 1 {
+		t.Errorf("player8(%d, %d); expected %d", player8.X, player8.Y, 1)
+	}
+	if player9.X != 1 || player9.Y != 1 {
+		t.Errorf("player9(%d, %d); expected %d", player9.X, player9.Y, 1)
+	}
 }
 
-//type Position struct {
-//	HasComponent
-//	X int
-//	Y int
-//}
-//
-//type Velocity struct {
-//	HasComponent
-//	DX int
-//	DY int
-//}
-//
-//type Moveable struct {
-//	HasSystem
-//}
-//
-//func (this *Moveable) Components() []Component {
-//	return []Component{
-//		&Position{},
-//		&Velocity{},
-//	}
-//}
-//
-//func (this *Moveable) Run(ecs *ECS, dt time.Duration) {
-//	log.Println(this.components[reflect.TypeOf(&Velocity{})])
-//
-//	velocities := this.components[reflect.TypeOf(&Velocity{})]
-//	for _, velocity := range velocities {
-//		log.Println("velocity", *velocity)
-//	}
-//
-//	for t, c := range this.components {
-//		log.Println(t, c)
-//		//switch t {
-//		//case reflect.TypeOf(&Velocity{}):
-//		//	log.Println("Velocity", c)
-//		//	for _, component := range c {
-//		//		m := reflect.ValueOf(component).Elem()
-//		//		log.Println(m)
-//		//		var v *Velocity = (*component).(*Velocity)
-//		//		log.Println(v, reflect.ValueOf(v).Kind())
-//		//	}
-//		//case reflect.TypeOf(&Position{}):
-//		//	log.Println("Position")
-//		//}
-//	}
-//}
-//
-//type I interface {
-//	M()
-//}
-//
-//type V struct {
-//	X int
-//	Y int
-//}
-//
-//func (this *V) M() {}
-//
-//func GetVs[T any](t I) T {
-//	return t.(T)
-//}
-//
-//func TestECS(t *testing.T) {
-//	var is map[reflect.Type][]I
-//	is = make(map[reflect.Type][]I)
-//
-//	v1 := new(V)
-//	//v2 := new(V)
-//	log.Println(reflect.TypeFor[V]())
-//
-//	is[reflect.TypeOf(v1).Elem()] = make([]I, 0)
-//	is[reflect.TypeOf(v1).Elem()] = append(is[reflect.TypeOf(v1).Elem()], v1)
-//
-//	log.Println(is)
-//	log.Println(is[reflect.TypeFor[V]()])
-//
-//	vs := is[reflect.TypeFor[V]()]
-//	for _, v := range vs {
-//		log.Println(v)
-//	}
-//
-//	// Create a new world
-//	ecs := New()
-//
-//	// Add at least one system to act
-//	ecs.AddSystem(&Moveable{})
-//
-//	// Create a new entity with components
-//	entity := ecs.CreateEntity().AddComponent(&Position{
-//		X: 2,
-//		Y: 2,
-//	}).AddComponent(&Velocity{
-//		DX: 1,
-//		DY: 1,
-//	})
-//	t.Logf("created entity %d", entity.Id)
-//	ecs.AddEntity(entity)
-//
-//	entity = ecs.CreateEntity().AddComponent(&Position{
-//		X: 5,
-//		Y: 5,
-//	}).AddComponent(&Velocity{
-//		DX: 2,
-//		DY: 2,
-//	})
-//	t.Logf("created entity %d", entity.Id)
-//	ecs.AddEntity(entity)
-//
-//	// Update the world
-//	for i := range 30 {
-//		// Simulate one second at 30 fps
-//		ecs.Update(time.Duration(float32(i)*33.33) * time.Millisecond)
-//	}
-//
-//	// Validate that the entity components changed based on the system
-//
-//}
+func BenchmarkECS(b *testing.B) {
+	b.ResetTimer()
+	b.ReportAllocs()
+
+	for i := 0; i < b.N; i++ {
+		// Create a new world
+		ecs := New()
+
+		// Add some interacting systems, working with same and different components
+		ecs.AddSystem(&MoveSystem{}, PositionComponent{}, VelocityComponent{})
+		ecs.AddSystem(&CollisionSystem{}, PositionComponent{}, BoundsComponent{})
+
+		// Add some entities, which are not captured by any system
+		ecs.CreateEntity(&PositionComponent{X: 1, Y: 1})          // 1
+		ecs.CreateEntity(&VelocityComponent{DX: 2, DY: 2})        // 2
+		ecs.CreateEntity(&BoundsComponent{Width: 10, Height: 10}) // 3
+
+		// Add two fully fledged players, with more than needed components
+		player4 := createPlayer("player4")
+		ecs.CreateEntity(&player4.PositionComponent, &player4.VelocityComponent, &player4.BoundsComponent) // 4
+		player5 := createPlayer("player5")
+		ecs.CreateEntity(&player5.PositionComponent, &player5.VelocityComponent, &player5.BoundsComponent) // 5
+
+		// Add reduced players, only fitting one system each
+		player6 := createPlayer("player6")
+		ecs.CreateEntity(&player6.PositionComponent, &player6.VelocityComponent) // 6
+		player7 := createPlayer("player7")
+		ecs.CreateEntity(&player7.PositionComponent, &player7.VelocityComponent) // 7
+		player8 := createPlayer("player8")
+		ecs.CreateEntity(&player8.PositionComponent, &player8.BoundsComponent) // 8
+		player9 := createPlayer("player9")
+		ecs.CreateEntity(&player9.PositionComponent, &player9.BoundsComponent) // 9
+
+		// bench one update
+		ecs.Update(33 * time.Millisecond)
+	}
+}
