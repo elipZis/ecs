@@ -42,6 +42,7 @@ func (this *ComponentStorage) GetComponents(componentType any) map[uint64]interf
 	return this.components[this.ecs.getPlainType(componentType)]
 }
 
+// GetEntityComponent is a typed helper to get a cast entity component from the ECS
 func GetEntityComponent[T any](ecs *ECS, eId uint64) T {
 	vals := ecs.GetComponents(reflect.TypeFor[T]())
 	val := vals[eId]

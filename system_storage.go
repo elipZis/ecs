@@ -32,7 +32,7 @@ func (this *SystemStorage) AddSystem(system System, types ...any) {
 
 	for _, t := range types {
 		// add to types
-		systemType := this.ecs.getPlainType(t)
+		systemType := reflect.TypeOf(t) //this.ecs.getPlainType(t)
 		this.systemTypes[system] = append(this.systemTypes[system], systemType)
 	}
 }
@@ -57,7 +57,7 @@ func (this *SystemStorage) QuerySystems(types ...any) []System {
 	// Check the types of the given
 	var plainTypes []reflect.Type
 	for _, t := range types {
-		plainTypes = append(plainTypes, this.ecs.getPlainType(t))
+		plainTypes = append(plainTypes, reflect.TypeOf(t)) //this.ecs.getPlainType(t))
 	}
 
 	for system, systemTypes := range this.systemTypes {

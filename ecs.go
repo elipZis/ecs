@@ -70,8 +70,17 @@ func (this *ECS) AddEntity(e any) Entity {
 
 		switch val.Kind() {
 		case reflect.Struct:
-			// Add all structs as components of this entity as reference
-			components = append(components, val.Interface())
+			if val.CanInterface() {
+				// Add all structs as components of this entity as reference
+				components = append(components, val.Interface())
+			}
+
+		case reflect.Pointer:
+			if val.CanInterface() && val.Elem().Kind() == reflect.Struct {
+				// Add all structs as components of this entity as reference
+				components = append(components, val.Interface())
+			}
+
 		default:
 		}
 	}
@@ -84,13 +93,13 @@ func (this *ECS) RemoveEntity(id uint64) {
 	entity := this.entities[id]
 
 	// Remove from systems
-	systems := this.systems.QuerySystems(entity.GetComponents())
+	systems := this.systems.QuerySystems(entity.GetComponents()...)
 	for _, system := range systems {
 		system.DetachEntity(entity)
 	}
 
 	// Remove from global components
-	this.components.RemoveComponent(entity, entity.GetComponents())
+	this.components.RemoveComponent(entity, entity.GetComponents()...)
 
 	// delete entities
 	delete(this.entities, id)

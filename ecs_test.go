@@ -1,7 +1,6 @@
 package ecs
 
 import (
-	"log"
 	"testing"
 	"time"
 )
@@ -33,8 +32,26 @@ func (this *MoveSystem) Run(ecs *ECS, dt time.Duration) {
 	vel := ecs.GetComponents(VelocityComponent{})
 
 	for _, entityId := range this.entities {
+		// Alternative way (faster, if you know what you get)
 		p := pos[entityId].(*PositionComponent)
 		v := vel[entityId].(*VelocityComponent)
+		// Alternative way (a little slower)
+		//p = GetEntityComponent[*PositionComponent](ecs, entityId)
+		//v = GetEntityComponent[*VelocityComponent](ecs, entityId)
+
+		p.X += v.DX
+		p.Y += v.DY
+	}
+}
+
+type MoveWithoutPtrSystem struct {
+	BaseSystem
+}
+
+func (this *MoveWithoutPtrSystem) Run(ecs *ECS, dt time.Duration) {
+	for _, entityId := range this.entities {
+		p := GetEntityComponent[PositionComponent](ecs, entityId)
+		v := GetEntityComponent[VelocityComponent](ecs, entityId)
 		p.X += v.DX
 		p.Y += v.DY
 	}
@@ -52,24 +69,6 @@ func (this *CollisionSystem) Run(ecs *ECS, dt time.Duration) {
 		_ = positions[entityId].(*PositionComponent)
 		_ = bounds[entityId].(*BoundsComponent)
 	}
-
-	//this.players.Range(func(key *uuid.UUID, player *Player) bool {
-	//	// Reset collision
-	//	player.GetBounds().Colliding = false
-	//
-	//	for _, mapObj := range this.Map.Objects {
-	//		// Only for non-player objects as players do not collide with each other
-	//		if _, ok := mapObj.(*Player); !ok {
-	//			// TODO: if colliding
-	//			if this.detectIntersection(player.GetPosition(), mapObj.GetPosition(), player.GetBounds(), mapObj.GetBounds()) {
-	//				// TODO: something
-	//				player.GetBounds().Colliding = true
-	//			}
-	//		}
-	//	}
-	//
-	//	return true
-	//})
 }
 
 type Player struct {
@@ -78,7 +77,8 @@ type Player struct {
 	BoundsComponent
 	CommComponent
 
-	s string
+	s *string
+	i int
 }
 
 // createPlayer is a helper to create testable player objects
@@ -88,7 +88,8 @@ func createPlayer(s string) Player {
 		VelocityComponent: VelocityComponent{DX: 2, DY: 2},
 		BoundsComponent:   BoundsComponent{Width: 10, Height: 10},
 		CommComponent:     CommComponent{},
-		s:                 s,
+		s:                 &s,
+		i:                 0,
 	}
 }
 
@@ -97,8 +98,8 @@ func TestECS(t *testing.T) {
 	ecs := New()
 
 	// Add some interacting systems, working with same and different components
-	ecs.AddSystem(&MoveSystem{}, PositionComponent{}, VelocityComponent{})
-	ecs.AddSystem(&CollisionSystem{}, PositionComponent{}, BoundsComponent{})
+	ecs.AddSystem(&MoveSystem{}, &PositionComponent{}, &VelocityComponent{})
+	ecs.AddSystem(&CollisionSystem{}, &PositionComponent{}, &BoundsComponent{})
 
 	// Add some entities, which are not captured by any system
 	ecs.CreateEntity(&PositionComponent{X: 1, Y: 1})          // 1
@@ -153,16 +154,62 @@ func TestECS_AddEntity(t *testing.T) {
 	ecs := New()
 
 	// Add some interacting systems, working with same and different components
-	ecs.AddSystem(&MoveSystem{}, PositionComponent{}, VelocityComponent{})
-	ecs.AddSystem(&CollisionSystem{}, PositionComponent{}, BoundsComponent{})
+	ecs.AddSystem(&MoveWithoutPtrSystem{}, PositionComponent{}, VelocityComponent{})
+	ecs.AddSystem(&CollisionSystem{}, &PositionComponent{}, &BoundsComponent{})
 
 	player := createPlayer("player")
 	ecs.AddEntity(player)
 
 	ecs.Update(33 * time.Millisecond)
 
-	log.Println(player.PositionComponent)
+	// Assertions
+	if player.X != 1 || player.Y != 1 {
+		t.Errorf("player(%d, %d); expected %d", player.X, player.Y, 1+player.DX)
+	}
+}
 
+func TestECS_AddEntity_ViaPtr(t *testing.T) {
+	// Create a new world
+	ecs := New()
+
+	// Add some interacting systems, working with same and different components
+	ecs.AddSystem(&MoveSystem{}, &PositionComponent{}, &VelocityComponent{})
+	ecs.AddSystem(&CollisionSystem{}, &PositionComponent{}, &BoundsComponent{})
+
+	player := createPlayer("player")
+	ecs.CreateEntity(&player.PositionComponent, &player.VelocityComponent, &player.BoundsComponent)
+
+	ecs.Update(33 * time.Millisecond)
+
+	// Assertions
+	if player.X != (1+player.DX) || player.Y != (1+player.DY) {
+		t.Errorf("player(%d, %d); expected %d", player.X, player.Y, 1+player.DX)
+	}
+}
+
+func TestECS_RemoveEntity(t *testing.T) {
+	// Create a new world
+	ecs := New()
+
+	// Add some interacting systems, working with same and different components
+	ecs.AddSystem(&MoveSystem{}, &PositionComponent{}, &VelocityComponent{})
+	ecs.AddSystem(&CollisionSystem{}, &PositionComponent{}, &BoundsComponent{})
+
+	player := createPlayer("player")
+	entity := ecs.CreateEntity(&player.PositionComponent, &player.VelocityComponent, &player.BoundsComponent)
+
+	// Update and check its correct
+	ecs.Update(33 * time.Millisecond)
+	// Assertions
+	if player.X != (1+player.DX) || player.Y != (1+player.DY) {
+		t.Errorf("player(%d, %d); expected %d", player.X, player.Y, 1+player.DX)
+	}
+
+	// Remove
+	ecs.RemoveEntity(entity.Id())
+
+	// Update and check again (should not have moved)
+	ecs.Update(33 * time.Millisecond)
 	// Assertions
 	if player.X != (1+player.DX) || player.Y != (1+player.DY) {
 		t.Errorf("player(%d, %d); expected %d", player.X, player.Y, 1+player.DX)
