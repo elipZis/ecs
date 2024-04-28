@@ -12,7 +12,7 @@ type ECS struct {
 
 	entities   map[uint64]Entity
 	systems    *SystemStorage
-	components map[reflect.Type]map[uint64]any
+	components *ComponentStorage
 	context    map[reflect.Type]any
 }
 
@@ -21,7 +21,7 @@ func New() (this *ECS) {
 
 	this.entities = make(map[uint64]Entity)
 	this.systems = NewSystemStorage(this)
-	this.components = make(map[reflect.Type]map[uint64]any)
+	this.components = NewComponentStorage(this)
 	this.context = make(map[reflect.Type]any)
 
 	return this
@@ -54,15 +54,29 @@ func (this *ECS) CreateEntity(components ...any) Entity {
 	}
 
 	// Store components globally by type
-	for _, c := range components {
-		cType := this.getPlainType(c)
-		if _, ok := this.components[cType]; !ok {
-			this.components[cType] = make(map[uint64]any)
-		}
-		this.components[cType][entity.Id()] = c
-	}
+	this.components.AddComponent(entity, components...)
 
 	return entity
+}
+
+// AddEntity via reflection of embedded structs
+func (this *ECS) AddEntity(e any) Entity {
+	// Get structs as components
+	var components []any
+	v := reflect.ValueOf(e)
+	t := reflect.TypeOf(e)
+	for i := 0; i < t.NumField(); i++ {
+		val := v.Field(i)
+
+		switch val.Kind() {
+		case reflect.Struct:
+			// Add all structs as components of this entity as reference
+			components = append(components, val.Interface())
+		default:
+		}
+	}
+
+	return this.CreateEntity(components...)
 }
 
 // RemoveEntity detaches the entity & components from all systems and globally
@@ -76,10 +90,7 @@ func (this *ECS) RemoveEntity(id uint64) {
 	}
 
 	// Remove from global components
-	for _, c := range entity.GetComponents() {
-		cType := this.getPlainType(c)
-		delete(this.components[cType], entity.Id())
-	}
+	this.components.RemoveComponent(entity, entity.GetComponents())
 
 	// delete entities
 	delete(this.entities, id)
@@ -90,28 +101,9 @@ func (this *ECS) GetEntity(id uint64) Entity {
 	return this.entities[id]
 }
 
-// TODO: AddEntity via reflection of embedded structs
-//func (this *ECS) AddEntity(e any) Entity {
-//	entity := newEntity(&this.entityCounter)
-//
-//	v := reflect.ValueOf(e)
-//	t := reflect.TypeOf(e)
-//	for i := 0; i < t.NumField(); i++ {
-//		val := v.Field(i)
-//
-//		switch val.Kind() {
-//		case reflect.Struct:
-//			log.Println("struct", v, v.Kind(), reflect.TypeOf(v.Interface()))
-//		default:
-//		}
-//	}
-//
-//	return entity
-//}
-
 // GetComponents by given type
 func (this *ECS) GetComponents(componentType any) map[uint64]interface{} {
-	return this.components[this.getPlainType(componentType)]
+	return this.components.GetComponents(componentType)
 }
 
 // AddSystem attaches the given system to this ECS under the given types
@@ -136,11 +128,16 @@ func (this *ECS) Update(dt time.Duration) *ECS {
 	return this
 }
 
-// getPlainType returns a non-pointer type from any given
+// getPlainType returns a non-pointer type from any given - TODO: remove?
 func (this *ECS) getPlainType(t any) reflect.Type {
-	typ := reflect.TypeOf(t)
-	if typ.Kind() == reflect.Ptr {
-		return typ.Elem()
+	var typ reflect.Type
+	if _, ok := t.(reflect.Type); !ok {
+		typ = reflect.TypeOf(t)
+	} else {
+		typ = t.(reflect.Type)
+	}
+	if typ.Kind() == reflect.Pointer {
+		typ = typ.Elem()
 	}
 	return typ
 }

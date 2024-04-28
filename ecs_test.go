@@ -1,6 +1,7 @@
 package ecs
 
 import (
+	"log"
 	"testing"
 	"time"
 )
@@ -144,6 +145,27 @@ func TestECS(t *testing.T) {
 	}
 	if player9.X != 1 || player9.Y != 1 {
 		t.Errorf("player9(%d, %d); expected %d", player9.X, player9.Y, 1)
+	}
+}
+
+func TestECS_AddEntity(t *testing.T) {
+	// Create a new world
+	ecs := New()
+
+	// Add some interacting systems, working with same and different components
+	ecs.AddSystem(&MoveSystem{}, PositionComponent{}, VelocityComponent{})
+	ecs.AddSystem(&CollisionSystem{}, PositionComponent{}, BoundsComponent{})
+
+	player := createPlayer("player")
+	ecs.AddEntity(player)
+
+	ecs.Update(33 * time.Millisecond)
+
+	log.Println(player.PositionComponent)
+
+	// Assertions
+	if player.X != (1+player.DX) || player.Y != (1+player.DY) {
+		t.Errorf("player(%d, %d); expected %d", player.X, player.Y, 1+player.DX)
 	}
 }
 

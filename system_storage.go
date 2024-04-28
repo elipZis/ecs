@@ -1,6 +1,8 @@
 package ecs
 
-import "reflect"
+import (
+	"reflect"
+)
 
 type SystemStorage struct {
 	ecs *ECS
