@@ -16,6 +16,7 @@ type ECS struct {
 	context    map[reflect.Type]any
 }
 
+// New creates a new ecs world
 func New() (this *ECS) {
 	this = new(ECS)
 
@@ -25,6 +26,14 @@ func New() (this *ECS) {
 	this.context = make(map[reflect.Type]any)
 
 	return this
+}
+
+// Clear nils all entities from this world
+func (this *ECS) Clear() {
+	this.entities = nil
+	this.context = nil
+	this.systems.Clear()
+	this.components.Clear()
 }
 
 // AddContext attaches any service, map or other interfaces to this ECS (there can only be one per type)

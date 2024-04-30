@@ -20,6 +20,11 @@ func NewSystemStorage(ecs *ECS) (this *SystemStorage) {
 	return
 }
 
+func (this *SystemStorage) Clear() {
+	this.systems = nil
+	this.systemTypes = nil
+}
+
 // All returns all systems
 func (this *SystemStorage) All() []System {
 	return this.systems

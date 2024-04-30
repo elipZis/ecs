@@ -18,6 +18,10 @@ func NewComponentStorage(ecs *ECS) (this *ComponentStorage) {
 	return
 }
 
+func (this *ComponentStorage) Clear() {
+	this.components = nil
+}
+
 // AddComponent stores the given components
 func (this *ComponentStorage) AddComponent(e Entity, components ...any) {
 	for _, c := range components {
