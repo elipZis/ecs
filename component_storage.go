@@ -55,10 +55,11 @@ func GetComponent[T any](components map[uint64]any, eId uint64) T {
 }
 
 // GetComponentsFor creates a typed map of the components
-func GetComponentsFor[T any](ecs *ECS) (retVals map[uint64]T) {
-	comps := ecs.GetComponents(reflect.TypeFor[T]())
-	for i, comp := range comps {
-		retVals[i] = comp.(T)
+func GetComponentsFor[T any](ecs *ECS) map[uint64]T {
+	typedComponents := make(map[uint64]T)
+	components := ecs.GetComponents(reflect.TypeFor[T]())
+	for i, c := range components {
+		typedComponents[i] = c.(T)
 	}
-	return retVals
+	return typedComponents
 }
