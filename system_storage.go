@@ -2,6 +2,7 @@ package ecs
 
 import (
 	"reflect"
+	"slices"
 )
 
 type SystemStorage struct {
@@ -34,6 +35,7 @@ func (this *SystemStorage) All() []System {
 func (this *SystemStorage) AddSystem(system System, types ...any) {
 	// add to slice
 	this.systems = append(this.systems, system)
+	this.sort()
 
 	for _, t := range types {
 		// add to types
@@ -53,6 +55,15 @@ func (this *SystemStorage) RemoveSystem(system System) {
 
 	// delete types
 	delete(this.systemTypes, system)
+	this.sort()
+}
+
+// sort systems by priority (higher = better)
+func (this *SystemStorage) sort() []System {
+	slices.SortStableFunc(this.systems, func(a, b System) int {
+		return a.Priority() - b.Priority()
+	})
+	return this.systems
 }
 
 // QuerySystems returns all systems matching all given types connotations

@@ -1,6 +1,6 @@
 # Entity Component System
 
-A simple, opinionated ECS for quick usage (but without optimization).
+A very simple, reflect.Type-based, opinionated ECS for quick usage (but without optimization).
 
 ## Installation
 
@@ -68,6 +68,10 @@ To create and register a new entity, call `world.CreateEntity(&player.PositionCo
 It returns the entity with id and components, unique to this world.
 
 The entity and their components will be injected into all systems, intersecting the component type combination. More is ok, less does not match!
+
+### Context
+
+Via `world.AddContext(...)` you can add anything as context, available globally to all systems to query for via `world.GetContext(...)`.
 
 ## Contributing
 

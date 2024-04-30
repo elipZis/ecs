@@ -8,6 +8,7 @@ type System interface {
 	Run(ecs *ECS, dt time.Duration)
 	AttachEntity(e Entity)
 	DetachEntity(e Entity)
+	Priority() int
 }
 
 type EntitySystem struct {
@@ -37,4 +38,9 @@ func (this *EntitySystem) detachEntityById(eId uint64) {
 			break
 		}
 	}
+}
+
+// Priority assigns this system importance - higher=better
+func (this *EntitySystem) Priority() int {
+	return 0
 }
