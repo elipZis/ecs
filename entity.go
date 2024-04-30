@@ -1,6 +1,9 @@
 package ecs
 
-import "sync/atomic"
+import (
+	"encoding/json"
+	"sync/atomic"
+)
 
 type Entity interface {
 	Id() uint64
@@ -10,6 +13,13 @@ type Entity interface {
 type BaseEntity struct {
 	id         uint64
 	components []any
+}
+
+// MarshalJSON to expose the id without exporting it, as it may not be altered!
+func (this *BaseEntity) MarshalJSON() ([]byte, error) {
+	return json.Marshal(map[string]interface{}{
+		"id": this.id,
+	})
 }
 
 func NewEntity(counter *atomic.Uint64) (this *BaseEntity) {

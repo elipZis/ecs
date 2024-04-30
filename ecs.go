@@ -32,8 +32,12 @@ func New() (this *ECS) {
 func (this *ECS) Clear() {
 	this.entities = nil
 	this.context = nil
-	this.systems.Clear()
-	this.components.Clear()
+	if this.systems != nil {
+		this.systems.Clear()
+	}
+	if this.components != nil {
+		this.components.Clear()
+	}
 }
 
 // AddContext attaches any service, map or other interfaces to this ECS (there can only be one per type)
