@@ -10,23 +10,27 @@ type System interface {
 	DetachEntity(e Entity)
 }
 
-type BaseSystem struct {
+type EntitySystem struct {
 	entities []uint64
 }
 
-func (this *BaseSystem) AttachEntity(e Entity) {
+func (this *EntitySystem) Entities() []uint64 {
+	return this.entities
+}
+
+func (this *EntitySystem) AttachEntity(e Entity) {
 	this.attachEntityById(e.Id())
 }
 
-func (this *BaseSystem) attachEntityById(eId uint64) {
+func (this *EntitySystem) attachEntityById(eId uint64) {
 	this.entities = append(this.entities, eId)
 }
 
-func (this *BaseSystem) DetachEntity(e Entity) {
+func (this *EntitySystem) DetachEntity(e Entity) {
 	this.detachEntityById(e.Id())
 }
 
-func (this *BaseSystem) detachEntityById(eId uint64) {
+func (this *EntitySystem) detachEntityById(eId uint64) {
 	for i, e := range this.entities {
 		if e == eId {
 			this.entities = append(this.entities[:i], this.entities[i+1:]...)

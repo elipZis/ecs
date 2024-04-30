@@ -24,7 +24,7 @@ type CommComponent struct {
 }
 
 type MoveSystem struct {
-	BaseSystem
+	EntitySystem
 }
 
 func (this *MoveSystem) Run(ecs *ECS, dt time.Duration) {
@@ -45,7 +45,7 @@ func (this *MoveSystem) Run(ecs *ECS, dt time.Duration) {
 }
 
 type MoveWithoutPtrSystem struct {
-	BaseSystem
+	EntitySystem
 }
 
 func (this *MoveWithoutPtrSystem) Run(ecs *ECS, dt time.Duration) {
@@ -58,7 +58,7 @@ func (this *MoveWithoutPtrSystem) Run(ecs *ECS, dt time.Duration) {
 }
 
 type CollisionSystem struct {
-	BaseSystem
+	EntitySystem
 }
 
 func (this *CollisionSystem) Run(ecs *ECS, dt time.Duration) {
