@@ -1,6 +1,7 @@
 package ecs
 
 import (
+	"cmp"
 	"reflect"
 	"slices"
 )
@@ -61,7 +62,7 @@ func (this *SystemStorage) RemoveSystem(system System) {
 // sort systems by priority (higher = better)
 func (this *SystemStorage) sort() []System {
 	slices.SortStableFunc(this.systems, func(a, b System) int {
-		return a.Priority() - b.Priority()
+		return cmp.Compare(b.Priority(), a.Priority())
 	})
 	return this.systems
 }
