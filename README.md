@@ -61,9 +61,61 @@ Add systems to the world via e.g. `world.AddSystem(&MoveSystem{}, &PositionCompo
 
 **Note: Systems must be registered before entities!**
 
+#### Priority
+
+By default all systems have a priority of 0. 
+If you want to order systems, you can implement
+
+```go
+Priority() int
+```
+
+The higher the number, the earlier the system is called.
+
+#### Components & Entities
+
+Inside a system you can access the ECS itself and you can get all components. 
+The entity system itself knows about all their own entity ids and can iterate on these. For example:
+
+```go
+func (this *MoveSystem) Run(ecs *ECS, dt time.Duration) {
+	pos := ecs.GetComponents(PositionComponent{})
+	vel := ecs.GetComponents(VelocityComponent{})
+
+	for _, entityId := range this.entities {
+		p := pos[entityId].(*PositionComponent)
+		v := vel[entityId].(*VelocityComponent)
+		p.X += v.DX
+		p.Y += v.DY
+	}
+}
+```
+
+or
+
+```go
+func (this *MoveSystem) Run(ecs *ECS, dt time.Duration) {
+    positions := ecs.GetComponentsFor[*component.PositionComponent](e)
+    velocities := ecs.GetComponents(VelocityComponent{})
+    
+    for _, entityId := range this.entities {
+        p := positions[entityId]
+        v := velocities[entityId]
+        p.X += v.DX
+        p.Y += v.DY
+    }
+}
+```
+
+There are several helper functions to provide access to the different components, context, entities etc.
+
 ### Entities
 
-To create and register a new entity, call `world.CreateEntity(&player.PositionComponent, &player.VelocityComponent, &player.OtherComponent)`
+To create and register a new entity, call 
+
+```go
+world.CreateEntity(&player.PositionComponent, &player.VelocityComponent, &player.OtherComponent)
+```
 
 It returns the entity with id and components, unique to this world.
 
@@ -80,17 +132,26 @@ to discuss what you would like to change.
 
 Please make sure to update tests as appropriate.
 
+## Notes
+
+This package is heavily inspired by
+
+- https://github.com/EngoEngine/ecs
+- https://github.com/amethyst/legion
+
+Kudos, shout-out and thanks to them 🙏
+
 ## Credits
 
 - [elipZis GmbH](https://elipZis.com)
 - [NeA](https://github.com/nea)
 - [All Contributors](https://github.com/elipZis/laravel-cacheable-model/contributors)
 
-Heavily inspired by
-- https://github.com/EngoEngine/ecs
-- https://github.com/amethyst/legion
+## Disclaimer
 
-Shout-out to them 🙏
+This source and the whole package comes without a warranty. It may or may not harm your computer. Please use with care. 
+Any damage cannot be related back to the author. The source has been tested on a virtual environment and scanned for viruses and has passed all tests.
+It is not optimized for production, speed or memory consumption but just a personal open-source package.
 
 ## License
 

@@ -30,18 +30,21 @@ type MoveSystem struct {
 func (this *MoveSystem) Run(ecs *ECS, dt time.Duration) {
 	pos := ecs.GetComponents(PositionComponent{})
 	vel := ecs.GetComponents(VelocityComponent{})
+	// Alternative way
+	//pos := GetComponentsFor[*PositionComponent](ecs)
+	//vel := GetComponentsFor[*VelocityComponent](ecs)
 
 	for _, entityId := range this.entities {
-		// Alternative way (faster, if you know what you get)
 		p := pos[entityId].(*PositionComponent)
 		v := vel[entityId].(*VelocityComponent)
-		// Alternative way (a little slower)
-		//p = GetEntityComponent[*PositionComponent](ecs, entityId)
-		//v = GetEntityComponent[*VelocityComponent](ecs, entityId)
 
 		p.X += v.DX
 		p.Y += v.DY
 	}
+}
+
+func (this *MoveSystem) Priority() int {
+	return 1000
 }
 
 type MoveWithoutPtrSystem struct {
@@ -69,6 +72,10 @@ func (this *CollisionSystem) Run(ecs *ECS, dt time.Duration) {
 		_ = positions[entityId].(*PositionComponent)
 		_ = bounds[entityId].(*BoundsComponent)
 	}
+}
+
+func (this *CollisionSystem) Priority() int {
+	return 999
 }
 
 type Player struct {
@@ -213,6 +220,27 @@ func TestECS_RemoveEntity(t *testing.T) {
 	// Assertions
 	if player.X != (1+player.DX) || player.Y != (1+player.DY) {
 		t.Errorf("player(%d, %d); expected %d", player.X, player.Y, 1+player.DX)
+	}
+}
+
+func TestECS_SystemPriority(t *testing.T) {
+	// Create a new world
+	ecs := New()
+
+	// Add collision first, but move has a higher priority
+	collisionSystem := CollisionSystem{}
+	moveSystem := MoveSystem{}
+	ecs.AddSystem(&collisionSystem, &PositionComponent{}, &BoundsComponent{})
+	ecs.AddSystem(&moveSystem, &PositionComponent{}, &VelocityComponent{})
+
+	player := createPlayer("player")
+	ecs.AddEntity(player)
+
+	ecs.Update(33 * time.Millisecond)
+
+	// Assertions
+	if ecs.systems.systems[0] != &moveSystem {
+		t.Errorf("system[0] = %v; expected %v", &ecs.systems.systems[0], &moveSystem)
 	}
 }
 
