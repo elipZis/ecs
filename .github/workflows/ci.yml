@@ -1,0 +1,36 @@
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  vulnerability_check:
+    runs-on: ubuntu-latest
+    name: Run govulncheck
+    steps:
+      - uses: golang/govulncheck-action@v1
+        with:
+          go-version-input: 1.22.0
+
+  test:
+    name: Build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '^1.22.0'
+
+      - name: Get dependencies
+        run: |
+          go get -v -t -d ./...
+
+      - name: Build
+        run: go build -v .
+
+      - name: Test
+        run: go test -v --bench=. ./...
