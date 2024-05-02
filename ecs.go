@@ -170,7 +170,7 @@ func (this *ECS) Update(dt time.Duration) *ECS {
 	return this
 }
 
-// getPlainType returns a non-pointer type from any given - TODO: remove?
+// getPlainType returns a non-pointer type from any given
 func (this *ECS) getPlainType(t any) reflect.Type {
 	var typ reflect.Type
 	if _, ok := t.(reflect.Type); !ok {

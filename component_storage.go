@@ -53,8 +53,8 @@ func GetEntityComponent[T any](ecs *ECS, eId uint64) T {
 	return val.(T)
 }
 
-// GetComponent is a casting helper to return a typed component by entity id
-func GetComponent[T any](components map[uint64]any, eId uint64) T {
+// GetComponentFor is a casting helper to return a typed component by entity id
+func GetComponentFor[T any](components map[uint64]any, eId uint64) T {
 	return components[eId].(T)
 }
 

@@ -121,6 +121,13 @@ It returns the entity with id and components, unique to this world.
 
 The entity and their components will be injected into all systems, intersecting the component type combination. More is ok, less does not match!
 
+#### Remove Entity
+
+To remove an entity, call e.g. `ecs.RemoveEntity(id uint64)` on the world or in a system.
+If you remove an entity, it will be marked to be removed before the next iteration.
+
+To immediately remove an entity, with consequences for subsequent systems, call `ecs.RemoveEntityNow(id uint64)`.
+
 ### Context
 
 Via `world.AddContext(...)` you can add anything as context, available globally to all systems to query for via `world.GetContext(...)`.
