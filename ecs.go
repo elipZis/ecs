@@ -11,6 +11,7 @@ type ECS struct {
 	entityCounter atomic.Uint64
 
 	entities   map[uint64]Entity
+	toRemove   []uint64
 	systems    *SystemStorage
 	components *ComponentStorage
 	context    map[reflect.Type]any
@@ -101,21 +102,36 @@ func (this *ECS) AddEntity(e any) Entity {
 	return this.CreateEntity(components...)
 }
 
-// RemoveEntity detaches the entity & components from all systems and globally
+// RemoveEntity marks an entity for deletion in the next iteration, to not affect the current run
 func (this *ECS) RemoveEntity(id uint64) {
+	this.toRemove = append(this.toRemove, id)
+}
+
+// removeEntities detaches the entity & components from all systems and globally
+func (this *ECS) removeEntities() {
+	for _, entityId := range this.toRemove {
+		this.RemoveEntityNow(entityId)
+	}
+	this.toRemove = make([]uint64, 0)
+}
+
+// RemoveEntityNow detaches the entity now, no matter of more systems are running
+func (this *ECS) RemoveEntityNow(id uint64) {
 	entity := this.entities[id]
 
-	// Remove from systems
-	systems := this.systems.QuerySystems(entity.GetComponents()...)
-	for _, system := range systems {
-		system.DetachEntity(entity)
+	if entity != nil {
+		// Remove from systems
+		systems := this.systems.QuerySystems(entity.GetComponents()...)
+		for _, system := range systems {
+			system.DetachEntity(entity)
+		}
+
+		// Remove from global components
+		this.components.RemoveComponent(entity, entity.GetComponents()...)
+
+		// delete entities
+		delete(this.entities, id)
 	}
-
-	// Remove from global components
-	this.components.RemoveComponent(entity, entity.GetComponents()...)
-
-	// delete entities
-	delete(this.entities, id)
 }
 
 // GetEntity returns the id referenced entity of this ECS
@@ -143,6 +159,10 @@ func (this *ECS) RemoveSystem(s System) *ECS {
 
 // Update calls all systems to run and do their stuff
 func (this *ECS) Update(dt time.Duration) *ECS {
+	// Clear all marked entities
+	this.removeEntities()
+
+	// Iterate on the systems
 	systems := this.systems.All()
 	for _, s := range systems {
 		s.Run(this, dt)
