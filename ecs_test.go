@@ -1,6 +1,7 @@
 package ecs
 
 import (
+	"fmt"
 	"testing"
 	"time"
 )
@@ -28,19 +29,25 @@ type MoveSystem struct {
 }
 
 func (this *MoveSystem) Run(ecs *ECS, dt time.Duration) {
-	pos := ecs.GetComponents(PositionComponent{})
-	vel := ecs.GetComponents(VelocityComponent{})
-	// Alternative way
-	//pos := GetComponentsFor[*PositionComponent](ecs)
-	//vel := GetComponentsFor[*VelocityComponent](ecs)
-
+	pos := GetComponentsFor[*PositionComponent](ecs)
+	vel := GetComponentsFor[*VelocityComponent](ecs)
 	for _, entityId := range this.entities {
-		p := pos[entityId].(*PositionComponent)
-		v := vel[entityId].(*VelocityComponent)
+		p := pos[entityId]
+		v := vel[entityId]
 
 		p.X += v.DX
 		p.Y += v.DY
 	}
+	// Alternative way
+	//pos := ecs.GetComponents(PositionComponent{})
+	//vel := ecs.GetComponents(VelocityComponent{})
+	//for _, entityId := range this.entities {
+	//	p := pos[entityId].(*PositionComponent)
+	//	v := vel[entityId].(*VelocityComponent)
+	//
+	//	p.X += v.DX
+	//	p.Y += v.DY
+	//}
 }
 
 func (this *MoveSystem) Priority() int {
@@ -58,6 +65,10 @@ func (this *MoveWithoutPtrSystem) Run(ecs *ECS, dt time.Duration) {
 		p.X += v.DX
 		p.Y += v.DY
 	}
+}
+
+func (this *MoveWithoutPtrSystem) Priority() int {
+	return 1000
 }
 
 type CollisionSystem struct {
@@ -229,9 +240,9 @@ func TestECS_SystemPriority(t *testing.T) {
 
 	// Add collision first, but move has a higher priority
 	collisionSystem := CollisionSystem{}
-	moveSystem := MoveSystem{}
+	moveSystem := MoveWithoutPtrSystem{}
 	ecs.AddSystem(&collisionSystem, &PositionComponent{}, &BoundsComponent{})
-	ecs.AddSystem(&moveSystem, &PositionComponent{}, &VelocityComponent{})
+	ecs.AddSystem(&moveSystem, PositionComponent{}, VelocityComponent{})
 
 	player := createPlayer("player")
 	ecs.AddEntity(player)
@@ -257,25 +268,25 @@ func BenchmarkECS(b *testing.B) {
 		ecs.AddSystem(&CollisionSystem{}, PositionComponent{}, BoundsComponent{})
 
 		// Add some entities, which are not captured by any system
-		ecs.CreateEntity(&PositionComponent{X: 1, Y: 1})          // 1
-		ecs.CreateEntity(&VelocityComponent{DX: 2, DY: 2})        // 2
-		ecs.CreateEntity(&BoundsComponent{Width: 10, Height: 10}) // 3
+		ecs.CreateEntity(&PositionComponent{X: 1, Y: 1})
+		ecs.CreateEntity(&VelocityComponent{DX: 2, DY: 2})
+		ecs.CreateEntity(&BoundsComponent{Width: 10, Height: 10})
 
-		// Add two fully fledged players, with more than needed components
-		player4 := createPlayer("player4")
-		ecs.CreateEntity(&player4.PositionComponent, &player4.VelocityComponent, &player4.BoundsComponent) // 4
-		player5 := createPlayer("player5")
-		ecs.CreateEntity(&player5.PositionComponent, &player5.VelocityComponent, &player5.BoundsComponent) // 5
+		// Add fully fledged players, with more than needed components
+		for j := 0; j < 100; j++ {
+			playerJ := createPlayer(fmt.Sprintf("player%d", j))
+			ecs.CreateEntity(&playerJ.PositionComponent, &playerJ.VelocityComponent, &playerJ.BoundsComponent)
+		}
 
 		// Add reduced players, only fitting one system each
-		player6 := createPlayer("player6")
-		ecs.CreateEntity(&player6.PositionComponent, &player6.VelocityComponent) // 6
-		player7 := createPlayer("player7")
-		ecs.CreateEntity(&player7.PositionComponent, &player7.VelocityComponent) // 7
-		player8 := createPlayer("player8")
-		ecs.CreateEntity(&player8.PositionComponent, &player8.BoundsComponent) // 8
-		player9 := createPlayer("player9")
-		ecs.CreateEntity(&player9.PositionComponent, &player9.BoundsComponent) // 9
+		player6 := createPlayer("player")
+		ecs.CreateEntity(&player6.PositionComponent, &player6.VelocityComponent)
+		player7 := createPlayer("player")
+		ecs.CreateEntity(&player7.PositionComponent, &player7.VelocityComponent)
+		player8 := createPlayer("player")
+		ecs.CreateEntity(&player8.PositionComponent, &player8.BoundsComponent)
+		player9 := createPlayer("player")
+		ecs.CreateEntity(&player9.PositionComponent, &player9.BoundsComponent)
 
 		// bench one update
 		ecs.Update(33 * time.Millisecond)

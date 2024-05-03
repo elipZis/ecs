@@ -49,8 +49,7 @@ func (this *ComponentStorage) GetComponents(componentType any) map[uint64]interf
 // GetEntityComponent is a typed helper to get a cast entity component from the ECS
 func GetEntityComponent[T any](ecs *ECS, eId uint64) T {
 	vals := ecs.GetComponents(reflect.TypeFor[T]())
-	val := vals[eId]
-	return val.(T)
+	return vals[eId].(T)
 }
 
 // GetComponentFor is a casting helper to return a typed component by entity id
@@ -60,8 +59,8 @@ func GetComponentFor[T any](components map[uint64]any, eId uint64) T {
 
 // GetComponentsFor creates a typed map of the components
 func GetComponentsFor[T any](ecs *ECS) map[uint64]T {
-	typedComponents := make(map[uint64]T)
 	components := ecs.GetComponents(reflect.TypeFor[T]())
+	typedComponents := make(map[uint64]T, len(components))
 	for i, c := range components {
 		typedComponents[i] = c.(T)
 	}
