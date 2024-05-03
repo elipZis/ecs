@@ -38,10 +38,10 @@ func (this *SystemStorage) AddSystem(system System, types ...any) {
 	this.systems = append(this.systems, system)
 	this.sort()
 
-	for _, t := range types {
+	this.systemTypes[system] = make([]reflect.Type, len(types))
+	for i, t := range types {
 		// add to types
-		systemType := reflect.TypeOf(t) //this.ecs.getPlainType(t)
-		this.systemTypes[system] = append(this.systemTypes[system], systemType)
+		this.systemTypes[system][i] = reflect.TypeOf(t) //this.ecs.getPlainType(t)
 	}
 }
 
@@ -53,10 +53,10 @@ func (this *SystemStorage) RemoveSystem(system System) {
 			this.systems = append(this.systems[:i], this.systems[i+1:]...)
 		}
 	}
+	this.sort()
 
 	// delete types
 	delete(this.systemTypes, system)
-	this.sort()
 }
 
 // sort systems by priority (higher = better)
@@ -72,13 +72,13 @@ func (this *SystemStorage) QuerySystems(types ...any) []System {
 	systems := make([]System, 0)
 
 	// Check the types of the given
-	var plainTypes []reflect.Type
-	for _, t := range types {
-		plainTypes = append(plainTypes, reflect.TypeOf(t)) //this.ecs.getPlainType(t))
+	reflectTypes := make([]reflect.Type, len(types))
+	for i, t := range types {
+		reflectTypes[i] = reflect.TypeOf(t) //this.ecs.getPlainType(t))
 	}
 
 	for system, systemTypes := range this.systemTypes {
-		if this.testTypesSubset(systemTypes, plainTypes) {
+		if this.testTypesSubset(systemTypes, reflectTypes) {
 			systems = append(systems, system)
 		}
 	}
@@ -88,7 +88,7 @@ func (this *SystemStorage) QuerySystems(types ...any) []System {
 
 // testTypesSubset checks if the needle is fully contained in the haystack
 func (this *SystemStorage) testTypesSubset(needle, haystack []reflect.Type) bool {
-	set := make(map[reflect.Type]int)
+	set := make(map[reflect.Type]int, len(haystack))
 	for _, value := range haystack {
 		set[value] += 1
 	}
