@@ -53,8 +53,8 @@ func (this *ECS) GetContext(c any) any {
 }
 
 // GetContextFor is a convenience generic call for easier type
-func GetContextFor[T any](ecs *ECS, c T) T {
-	return ecs.GetContext(c)
+func GetContextFor[T any](ecs *ECS) T {
+	return ecs.GetContext(reflect.TypeFor[T]())
 }
 
 // CreateEntity scaffolds a new entity with the given components
