@@ -255,6 +255,26 @@ func TestECS_SystemPriority(t *testing.T) {
 	}
 }
 
+func TestECS_AddSystemAfterEntity(t *testing.T) {
+	// Create a new world
+	ecs := New()
+
+	// Create entity
+	player := createPlayer("player")
+	ecs.CreateEntity(&player.PositionComponent, &player.VelocityComponent, &player.BoundsComponent)
+
+	// Add systems later
+	ecs.AddSystem(&MoveSystem{}, &PositionComponent{}, &VelocityComponent{})
+	ecs.AddSystem(&CollisionSystem{}, &PositionComponent{}, &BoundsComponent{})
+
+	ecs.Update(33 * time.Millisecond)
+
+	// Assertions
+	if player.X != (1+player.DX) || player.Y != (1+player.DY) {
+		t.Errorf("player(%d, %d); expected %d", player.X, player.Y, 1+player.DX)
+	}
+}
+
 func BenchmarkECS(b *testing.B) {
 	b.ResetTimer()
 	b.ReportAllocs()

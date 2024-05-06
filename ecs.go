@@ -146,8 +146,21 @@ func (this *ECS) GetComponents(componentType any) map[uint64]interface{} {
 
 // AddSystem attaches the given system to this ECS under the given types
 func (this *ECS) AddSystem(s System, types ...any) *ECS {
-	this.systems.AddSystem(s, types...)
-	// TODO: Check whether existing entities should be added to this new system
+	systemTypes := this.systems.AddSystem(s, types...)
+
+	// Check whether existing entities should be added to this new system
+	for _, entity := range this.entities {
+		// Check the entity component types
+		var entityTypes []reflect.Type
+		for _, c := range entity.GetComponents() {
+			entityTypes = append(entityTypes, reflect.TypeOf(c))
+		}
+
+		if this.systems.testTypesSubset(systemTypes, entityTypes) {
+			s.AttachEntity(entity)
+		}
+	}
+
 	return this
 }
 

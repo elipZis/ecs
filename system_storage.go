@@ -33,7 +33,7 @@ func (this *SystemStorage) All() []System {
 }
 
 // AddSystem stores the given system under every type to this storage
-func (this *SystemStorage) AddSystem(system System, types ...any) {
+func (this *SystemStorage) AddSystem(system System, types ...any) []reflect.Type {
 	// add to slice
 	this.systems = append(this.systems, system)
 	this.sort()
@@ -43,6 +43,7 @@ func (this *SystemStorage) AddSystem(system System, types ...any) {
 		// add to types
 		this.systemTypes[system][i] = reflect.TypeOf(t) //this.ecs.getPlainType(t)
 	}
+	return this.systemTypes[system]
 }
 
 // RemoveSystem slices the given system out of every type from this storage
