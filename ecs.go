@@ -52,6 +52,11 @@ func (this *ECS) GetContext(c any) any {
 	return this.context[this.getPlainType(c)]
 }
 
+// GetContextFor is a convenience generic call for easier type
+func GetContextFor[T any](ecs *ECS, c T) T {
+	return ecs.GetContext(c)
+}
+
 // CreateEntity scaffolds a new entity with the given components
 func (this *ECS) CreateEntity(components ...any) Entity {
 	entity := NewEntity(&this.entityCounter)
