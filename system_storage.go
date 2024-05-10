@@ -13,6 +13,8 @@ type SystemStorage struct {
 	systems []System
 	// per system, n types it requires
 	systemTypes map[System][]reflect.Type
+	// group systems without overlapping types to parallelize
+	parallelSystems [][]System
 }
 
 func NewSystemStorage(ecs *ECS) (this *SystemStorage) {
@@ -22,9 +24,11 @@ func NewSystemStorage(ecs *ECS) (this *SystemStorage) {
 	return
 }
 
+// Clear nils all systems
 func (this *SystemStorage) Clear() {
 	this.systems = nil
 	this.systemTypes = nil
+	this.parallelSystems = nil
 }
 
 // All returns all systems
@@ -65,6 +69,28 @@ func (this *SystemStorage) sort() []System {
 	slices.SortStableFunc(this.systems, func(a, b System) int {
 		return cmp.Compare(b.Priority(), a.Priority())
 	})
+
+	// Check whether systems can run in parallel
+	this.parallelSystems = make([][]System, 0)
+	for i := 0; i < len(this.systems); i++ {
+		// All have been compared
+		if i+1 >= len(this.systems) {
+			break
+		}
+
+		s1 := this.systems[i]
+		st1 := this.systemTypes[s1]
+		// Compare to each other
+		for j := i + 1; j < len(this.systems); j++ {
+			s2 := this.systems[j]
+			st2 := this.systemTypes[s2]
+			// In case of no type equality, we can run in parallel (no overlap)
+			if this.testTypesOverlap(st1, st2) {
+				this.parallelSystems = append(this.parallelSystems, []System{s1, s2})
+			}
+		}
+	}
+
 	return this.systems
 }
 
@@ -118,6 +144,18 @@ func (this *SystemStorage) testTypesEq(a, b []reflect.Type) bool {
 		}
 	}
 	return true
+}
+
+// testTypesOverlap compares the type slices for any overlap (not a single same type)
+func (this *SystemStorage) testTypesOverlap(a, b []reflect.Type) bool {
+	for i := range a {
+		for j := range b {
+			if a[i] == b[j] {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // intersectSystems returns the intersection of the given systems
