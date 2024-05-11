@@ -14,14 +14,21 @@ type SystemStorage struct {
 	// per system, n types it requires
 	systemTypes map[System][]reflect.Type
 	// group systems without overlapping types to parallelize
+	parallel        bool
 	parallelSystems [][]System
 }
 
-func NewSystemStorage(ecs *ECS) (this *SystemStorage) {
+func NewSystemStorage(ecs *ECS, parallel bool) (this *SystemStorage) {
 	this = new(SystemStorage)
 	this.ecs = ecs
+	this.parallel = parallel
 	this.systemTypes = make(map[System][]reflect.Type)
 	return
+}
+
+// NewParallelSystemStorage creates a parallel-systems tracking storage (costs, do not use if you don't need it)
+func NewParallelSystemStorage(ecs *ECS) (this *SystemStorage) {
+	return NewSystemStorage(ecs, true)
 }
 
 // Clear nils all systems
@@ -36,17 +43,25 @@ func (this *SystemStorage) All() []System {
 	return this.systems
 }
 
+// AllParallel returns all systems grouped by parallelity
+func (this *SystemStorage) AllParallel() [][]System {
+	return this.parallelSystems
+}
+
 // AddSystem stores the given system under every type to this storage
 func (this *SystemStorage) AddSystem(system System, types ...any) []reflect.Type {
 	// add to slice
 	this.systems = append(this.systems, system)
-	this.sort()
-
 	this.systemTypes[system] = make([]reflect.Type, len(types))
 	for i, t := range types {
 		// add to types
 		this.systemTypes[system][i] = reflect.TypeOf(t) //this.ecs.getPlainType(t)
 	}
+
+	// Sort
+	this.sort()
+	this.parallelize()
+
 	return this.systemTypes[system]
 }
 
@@ -58,10 +73,13 @@ func (this *SystemStorage) RemoveSystem(system System) {
 			this.systems = append(this.systems[:i], this.systems[i+1:]...)
 		}
 	}
-	this.sort()
 
 	// delete types
 	delete(this.systemTypes, system)
+
+	// Sort
+	this.sort()
+	this.parallelize()
 }
 
 // sort systems by priority (higher = better)
@@ -69,29 +87,43 @@ func (this *SystemStorage) sort() []System {
 	slices.SortStableFunc(this.systems, func(a, b System) int {
 		return cmp.Compare(b.Priority(), a.Priority())
 	})
+	return this.systems
+}
 
-	// Check whether systems can run in parallel
-	this.parallelSystems = make([][]System, 0)
-	for i := 0; i < len(this.systems); i++ {
-		// All have been compared
-		if i+1 >= len(this.systems) {
-			break
-		}
-
-		s1 := this.systems[i]
-		st1 := this.systemTypes[s1]
-		// Compare to each other
-		for j := i + 1; j < len(this.systems); j++ {
-			s2 := this.systems[j]
-			st2 := this.systemTypes[s2]
-			// In case of no type equality, we can run in parallel (no overlap)
-			if this.testTypesOverlap(st1, st2) {
-				this.parallelSystems = append(this.parallelSystems, []System{s1, s2})
-			}
-		}
+// parallelize compares all systems against each other to build a 2-dim slice of parallel runnable systems
+func (this *SystemStorage) parallelize() [][]System {
+	if !this.parallel {
+		return this.parallelSystems
 	}
 
-	return this.systems
+	// Check whether systems can run in parallel anew
+	this.parallelSystems = make([][]System, 0)
+	systems := append([]System(nil), this.systems...)
+	var pSystems []System
+	for len(systems) > 0 {
+		pSystems, systems = this.testSystemsOverlap(systems[0], systems)
+		this.parallelSystems = append(this.parallelSystems, pSystems)
+	}
+	return this.parallelSystems
+}
+
+// testSystemsOverlap compares systemA vs all other systems to find commonalities
+func (this *SystemStorage) testSystemsOverlap(a System, systems []System) (pSystems []System, otherSystems []System) {
+	// The parallel systems to run with a
+	pSystems = append(pSystems, a)
+
+	// Check against all others
+	for i := 1; i < len(systems); i++ {
+		b := systems[i]
+
+		// In case of no type equality, we can run in parallel (no overlap)
+		if !this.testTypesOverlap(this.systemTypes[a], this.systemTypes[b]) {
+			pSystems = append(pSystems, b)
+		} else {
+			otherSystems = append(otherSystems, b)
+		}
+	}
+	return pSystems, otherSystems
 }
 
 // QuerySystems returns all systems matching all given types connotations

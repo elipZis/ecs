@@ -7,7 +7,7 @@ import (
 
 func Test_IntersectSystems(t *testing.T) {
 	ecs := New()
-	storage := NewSystemStorage(ecs)
+	storage := NewSystemStorage(ecs, false)
 
 	s1 := MoveSystem{}
 	s2 := CollisionSystem{}
@@ -44,7 +44,7 @@ func Test_IntersectSystems(t *testing.T) {
 
 func Test_NoIntersectSystems(t *testing.T) {
 	ecs := New()
-	storage := NewSystemStorage(ecs)
+	storage := NewSystemStorage(ecs, false)
 
 	a := []System{
 		&MoveSystem{},
@@ -63,7 +63,7 @@ func Test_NoIntersectSystems(t *testing.T) {
 
 func Test_TypesOverlap(t *testing.T) {
 	ecs := New()
-	storage := NewSystemStorage(ecs)
+	storage := NewSystemStorage(ecs, false)
 
 	// Completely equal
 	a := []reflect.Type{
@@ -84,10 +84,10 @@ func Test_TypesOverlap(t *testing.T) {
 	// One common component
 	a = []reflect.Type{
 		reflect.TypeOf(BoundsComponent{}),
-		reflect.TypeOf(PositionComponent{}),
+		reflect.TypeOf(&PositionComponent{}),
 	}
 	b = []reflect.Type{
-		reflect.TypeOf(PositionComponent{}),
+		reflect.TypeOf(&PositionComponent{}),
 		reflect.TypeOf(CommComponent{}),
 	}
 	overlap = storage.testTypesOverlap(a, b)
@@ -99,7 +99,7 @@ func Test_TypesOverlap(t *testing.T) {
 
 	// No common component
 	a = []reflect.Type{
-		reflect.TypeOf(BoundsComponent{}),
+		reflect.TypeOf(&BoundsComponent{}),
 		reflect.TypeOf(PositionComponent{}),
 	}
 	b = []reflect.Type{
@@ -110,5 +110,64 @@ func Test_TypesOverlap(t *testing.T) {
 	// Assertions
 	if overlap {
 		t.Errorf("overlap %v; expected %v", overlap, false)
+	}
+}
+
+func Test_Sort(t *testing.T) {
+	ecs := New()
+	storage := NewSystemStorage(ecs, false)
+
+	collisionSystem := CollisionSystem{}
+	moveSystem := MoveWithoutPtrSystem{}
+	storage.AddSystem(&collisionSystem, &PositionComponent{}, &BoundsComponent{})
+	storage.AddSystem(&moveSystem, PositionComponent{}, VelocityComponent{})
+
+	// Assertions
+	if storage.systems[0] != &moveSystem {
+		t.Errorf("system[0] = %v; expected %v", &storage.systems[0], &moveSystem)
+	}
+}
+
+func Test_Parallelize(t *testing.T) {
+	ecs := New()
+	storage := NewParallelSystemStorage(ecs)
+
+	collisionSystem := CollisionSystem{}
+	movePtrSystem := MoveWithoutPtrSystem{}
+	moveSystem := MoveSystem{}
+	storage.AddSystem(&collisionSystem, &PositionComponent{}, &BoundsComponent{})
+	storage.AddSystem(&movePtrSystem, &PositionComponent{}, &VelocityComponent{})
+	storage.AddSystem(&moveSystem, &PositionComponent{}, &VelocityComponent{})
+
+	// Assertions
+	if len(storage.parallelSystems) != 3 {
+		t.Errorf("parallelSystems = %v; expected %v", len(storage.parallelSystems), 3)
+	}
+
+	storage = NewParallelSystemStorage(ecs)
+	storage.AddSystem(&collisionSystem, &PositionComponent{}, &BoundsComponent{})
+	storage.AddSystem(&movePtrSystem, PositionComponent{}, &VelocityComponent{})
+	storage.AddSystem(&moveSystem, &PositionComponent{}, &VelocityComponent{})
+
+	// Assertions
+	if len(storage.parallelSystems) != 2 {
+		t.Errorf("parallelSystems = %v; expected %v", len(storage.parallelSystems), 2)
+	}
+}
+
+func Test_NoParallelize(t *testing.T) {
+	ecs := New()
+	storage := NewSystemStorage(ecs, false)
+
+	collisionSystem := CollisionSystem{}
+	movePtrSystem := MoveWithoutPtrSystem{}
+	moveSystem := MoveSystem{}
+	storage.AddSystem(&collisionSystem, &PositionComponent{}, &BoundsComponent{})
+	storage.AddSystem(&movePtrSystem, PositionComponent{}, &VelocityComponent{})
+	storage.AddSystem(&moveSystem, &PositionComponent{}, &VelocityComponent{})
+
+	// Assertions
+	if len(storage.parallelSystems) != 0 {
+		t.Errorf("parallelSystems = %v; expected %v", len(storage.parallelSystems), 0)
 	}
 }

@@ -2,11 +2,14 @@ package ecs
 
 import (
 	"reflect"
+	"sync"
 	"sync/atomic"
 	"time"
 )
 
 type ECS struct {
+	parallel bool
+
 	// unique atomic counter per ECS
 	entityCounter atomic.Uint64
 
@@ -17,16 +20,26 @@ type ECS struct {
 	context    map[reflect.Type]any
 }
 
-// New creates a new ecs world
-func New() (this *ECS) {
+func newECS(parallel bool) (this *ECS) {
 	this = new(ECS)
 
+	this.parallel = parallel
 	this.entities = make(map[uint64]Entity)
-	this.systems = NewSystemStorage(this)
+	this.systems = NewSystemStorage(this, parallel)
 	this.components = NewComponentStorage(this)
 	this.context = make(map[reflect.Type]any)
 
 	return this
+}
+
+// New creates a new synchronous ecs world
+func New() (this *ECS) {
+	return newECS(false)
+}
+
+// NewParallel creates a new asynchronous ecs world (costs, do not use if you don't need it)
+func NewParallel() (this *ECS) {
+	return newECS(true)
 }
 
 // Clear nils all entities from this world
@@ -182,10 +195,28 @@ func (this *ECS) Update(dt time.Duration) *ECS {
 	this.removeEntities()
 
 	// Iterate on the systems
-	systems := this.systems.All()
-	for _, s := range systems {
-		s.Run(this, dt)
+	if this.parallel {
+		systems := this.systems.AllParallel()
+		for _, s := range systems {
+			// Wait for all systems in a parallel group to finish
+			var wg sync.WaitGroup
+			for _, system := range s {
+				wg.Add(1)
+				go func() {
+					defer wg.Done()
+					system.Run(this, dt)
+				}()
+			}
+			wg.Wait()
+		}
+
+	} else {
+		systems := this.systems.All()
+		for _, s := range systems {
+			s.Run(this, dt)
+		}
 	}
+
 	return this
 }
 
