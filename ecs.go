@@ -126,6 +126,23 @@ func (this *ECS) RemoveEntity(id uint64) {
 	this.toRemove = append(this.toRemove, id)
 }
 
+// DetachEntityFromNow detaches an entity from a corresponding system
+func (this *ECS) DetachEntityFromNow(id uint64, systems ...System) {
+	entity := this.entities[id]
+
+	if entity != nil {
+		// Detach from systems
+		qSystems := this.systems.QuerySystems(entity.GetComponents()...)
+		if len(systems) > 0 {
+			qSystems = this.systems.intersectSystems(systems, qSystems)
+		}
+		// Remove this entity from the resulting systems
+		for _, system := range qSystems {
+			system.DetachEntity(entity)
+		}
+	}
+}
+
 // removeEntities detaches the entity & components from all systems and globally
 func (this *ECS) removeEntities() {
 	for _, entityId := range this.toRemove {
@@ -134,21 +151,18 @@ func (this *ECS) removeEntities() {
 	this.toRemove = make([]uint64, 0)
 }
 
-// RemoveEntityNow detaches the entity now, no matter of more systems are running
+// RemoveEntityNow detaches the entity now, no matter if more systems are running
 func (this *ECS) RemoveEntityNow(id uint64) {
 	entity := this.entities[id]
 
 	if entity != nil {
-		// Remove from systems
-		systems := this.systems.QuerySystems(entity.GetComponents()...)
-		for _, system := range systems {
-			system.DetachEntity(entity)
-		}
+		// Detach from systems
+		this.DetachEntityFromNow(id)
 
 		// Remove from global components
 		this.components.RemoveComponent(entity, entity.GetComponents()...)
 
-		// delete entities
+		// Delete entity
 		delete(this.entities, id)
 	}
 }

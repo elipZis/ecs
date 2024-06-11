@@ -291,6 +291,47 @@ func Test_ECS_RemoveEntity(t *testing.T) {
 	}
 }
 
+func Test_ECS_DetachEntity(t *testing.T) {
+	// Create a new world
+	ecs := New()
+
+	// Add some interacting systems, working with same and different components
+	mS := MoveSystem{}
+	cS := CollisionSystem{}
+	ecs.AddSystem(&mS, &PositionComponent{}, &VelocityComponent{})
+	ecs.AddSystem(&cS, &PositionComponent{}, &BoundsComponent{})
+
+	player := createPlayer("player")
+	entity := ecs.CreateEntity(&player.PositionComponent, &player.VelocityComponent, &player.BoundsComponent)
+
+	// Update and check its correct
+	ecs.Update(33 * time.Millisecond)
+	// Assertions
+	if player.X != (1+player.DX) || player.Y != (1+player.DY) {
+		t.Errorf("player(%d, %d); expected %d", player.X, player.Y, 1+player.DX)
+	}
+
+	// Remove
+	ecs.DetachEntityFromNow(entity.Id(), &cS)
+
+	// Update and check again (should not have moved)
+	ecs.Update(33 * time.Millisecond)
+	// Assertions
+	if player.X != (1+(2*player.DX)) || player.Y != (1+(2*player.DY)) {
+		t.Errorf("player(%d, %d); expected %d", player.X, player.Y, 1+player.DX)
+	}
+
+	// Remove
+	ecs.DetachEntityFromNow(entity.Id(), &mS)
+
+	// Update and check again (should not have moved)
+	ecs.Update(33 * time.Millisecond)
+	// Assertions
+	if player.X != (1+(2*player.DX)) || player.Y != (1+(2*player.DY)) {
+		t.Errorf("player(%d, %d); expected %d", player.X, player.Y, 1+player.DX)
+	}
+}
+
 func Test_ECS_SystemPriority(t *testing.T) {
 	// Create a new world
 	ecs := New()
